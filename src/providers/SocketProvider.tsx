@@ -1,76 +1,61 @@
 "use client";
 
-import { useEffect } from "react";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { useEffect, useRef } from "react";
 import { useAuthStore } from "@/stores/auth.store";
 import { useQueueStore } from "@/stores/queue.store";
+import api from "@/lib/api";
 
 /**
- * Firestore real-time listener provider
- * Socket.io yerine Firestore onSnapshot kullanır
+ * Sıra takip provider — Demo modda polling, production'da Firestore real-time
  */
 export function SocketProvider({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated } = useAuthStore();
   const { setMyQueue, setLastNotification } = useQueueStore();
+  const prevStatusRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated || !user) return;
+    if (user.role !== "PATIENT") return;
 
-    const unsubscribers: (() => void)[] = [];
+    // Polling: her 5 saniyede sıra bilgisi güncelle
+    async function pollQueue() {
+      try {
+        const res = await api.get("/api/queue/my");
+        const data = res.data;
 
-    if (user.role === "PATIENT") {
-      // Hasta: kendi aktif sıra kaydını real-time dinle
-      const activeStatuses = ["WAITING", "NOTIFIED", "CALLED", "IN_ROOM", "RETURNED"];
-      const q = query(
-        collection(db, "queueEntries"),
-        where("patientId", "==", user.uid),
-        where("status", "in", activeStatuses)
-      );
-
-      const unsub = onSnapshot(q, (snapshot) => {
-        if (snapshot.empty) {
+        if (!data) {
           setMyQueue(null);
           return;
         }
 
-        const entry = snapshot.docs[0].data();
-        const previousStatus = useQueueStore.getState().myQueue?.status;
-
         setMyQueue({
-          displayCode: entry.displayCode,
-          status: entry.status,
-          positionAhead: 0, // Ayrıca API'den polling ile güncellenecek
-          estimatedWaitMinutes: 0,
+          displayCode: data.displayCode,
+          status: data.status,
+          positionAhead: data.positionAhead,
+          estimatedWaitMinutes: data.estimatedWaitMinutes,
         });
 
         // Durum değişikliği bildirimleri
-        if (previousStatus && previousStatus !== entry.status) {
-          if (entry.status === "CALLED") {
-            setLastNotification(`Sıranız geldi! Kod: ${entry.displayCode}`);
-            // Titreşim
-            if ("vibrate" in navigator) {
-              navigator.vibrate([200, 100, 200, 100, 200]);
-            }
-            // Ses
-            try {
-              new Audio("/notification.mp3").play().catch(() => {});
-            } catch {}
-          } else if (entry.status === "NOTIFIED") {
+        if (prevStatusRef.current && prevStatusRef.current !== data.status) {
+          if (data.status === "CALLED") {
+            setLastNotification(`Sıranız geldi! Kod: ${data.displayCode}`);
+            if ("vibrate" in navigator) navigator.vibrate([200, 100, 200, 100, 200]);
+            try { new Audio("/notification.mp3").play().catch(() => {}); } catch {}
+          } else if (data.status === "NOTIFIED") {
             setLastNotification("Sıranız yaklaşıyor! Lütfen hazır olun.");
-            if ("vibrate" in navigator) {
-              navigator.vibrate([100, 50, 100]);
-            }
+            if ("vibrate" in navigator) navigator.vibrate([100, 50, 100]);
           }
         }
-      });
-
-      unsubscribers.push(unsub);
+        prevStatusRef.current = data.status;
+      } catch {
+        // Henüz sırada değilse hata normal
+      }
     }
 
-    return () => {
-      unsubscribers.forEach((unsub) => unsub());
-    };
+    pollQueue();
+    const interval = setInterval(pollQueue, 5000);
+
+    return () => clearInterval(interval);
   }, [isAuthenticated, user, setMyQueue, setLastNotification]);
 
   return <>{children}</>;

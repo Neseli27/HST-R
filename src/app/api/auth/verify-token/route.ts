@@ -1,15 +1,27 @@
 export const dynamic = "force-dynamic";
 import { NextRequest } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import { adminAuth, adminDb, DEMO_MODE } from "@/lib/firebase-admin";
 import { apiHandler, jsonResponse, errorResponse } from "@/lib/api-utils";
 import type { UserDoc } from "@/types";
 
 /**
  * POST /api/auth/verify-token
- * Firebase Auth token doğrula, kullanıcı yoksa Firestore'da oluştur
+ * Demo modda: { demoUserId: "demo-patient" }
+ * Production'da: { idToken: "firebase-token" }
  */
 export const POST = apiHandler(async (req: NextRequest) => {
-  const { idToken } = await req.json();
+  const body = await req.json();
+
+  if (DEMO_MODE && body.demoUserId) {
+    const userDoc = await adminDb.collection("users").doc(body.demoUserId).get();
+    if (!userDoc.exists) return errorResponse("Demo kullanıcı bulunamadı", 404);
+
+    const user = userDoc.data();
+    return jsonResponse({ user: { id: body.demoUserId, ...user }, isNewUser: false });
+  }
+
+  // Production Firebase Auth
+  const { idToken } = body;
   if (!idToken) return errorResponse("Token gerekli");
 
   const decoded = await adminAuth.verifyIdToken(idToken);
@@ -17,12 +29,10 @@ export const POST = apiHandler(async (req: NextRequest) => {
   const userDoc = await userRef.get();
 
   if (userDoc.exists) {
-    // Mevcut kullanıcı
     const user = userDoc.data() as UserDoc;
     return jsonResponse({ user: { id: decoded.uid, ...user }, isNewUser: false });
   }
 
-  // Yeni kullanıcı — telefon ile giriş yaptıysa
   const newUser: UserDoc = {
     uid: decoded.uid,
     phone: decoded.phone_number || "",

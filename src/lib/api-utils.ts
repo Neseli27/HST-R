@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "./firebase-admin";
+import { adminAuth, adminDb, DEMO_MODE } from "./firebase-admin";
 import type { Role, UserDoc } from "@/types";
 
 export function jsonResponse<T>(data: T, status = 200) {
@@ -19,24 +19,49 @@ export interface AuthUser {
 }
 
 /**
- * Firebase Auth token'ı doğrular ve kullanıcı bilgilerini döner
+ * Auth doğrulama — DEMO_MODE'da header'daki demo user ID'yi kullanır
  */
 export async function verifyAuth(req: NextRequest): Promise<AuthUser | null> {
   const authHeader = req.headers.get("authorization");
   if (!authHeader?.startsWith("Bearer ")) return null;
 
   const token = authHeader.slice(7);
-  try {
-    const decoded = await adminAuth.verifyIdToken(token);
 
-    // Firestore'dan kullanıcı bilgilerini al
+  try {
+    if (DEMO_MODE) {
+      // Demo mode: token = user ID (ör: "demo-patient")
+      const userDoc = await adminDb.collection("users").doc(token).get();
+      if (!userDoc.exists) return null;
+
+      const user = userDoc.data() as UserDoc;
+
+      let doctorId: string | null = null;
+      if (user.role === "DOCTOR") {
+        const doctorSnap = await adminDb
+          .collection("doctors")
+          .where("userId", "==", token)
+          .limit(1)
+          .get();
+        if (!doctorSnap.empty) doctorId = doctorSnap.docs[0].id;
+      }
+
+      return {
+        uid: token,
+        role: user.role,
+        hospitalId: user.hospitalId,
+        doctorId,
+        managedByDoctorId: user.managedByDoctorId,
+      };
+    }
+
+    // Production: Firebase Auth token doğrula
+    const decoded = await adminAuth.verifyIdToken(token);
     const userDoc = await adminDb.collection("users").doc(decoded.uid).get();
     if (!userDoc.exists) return null;
 
     const user = userDoc.data() as UserDoc;
     if (!user.isActive) return null;
 
-    // Doktor ID'sini bul (doktor ise)
     let doctorId: string | null = null;
     if (user.role === "DOCTOR") {
       const doctorSnap = await adminDb
@@ -44,9 +69,7 @@ export async function verifyAuth(req: NextRequest): Promise<AuthUser | null> {
         .where("userId", "==", decoded.uid)
         .limit(1)
         .get();
-      if (!doctorSnap.empty) {
-        doctorId = doctorSnap.docs[0].id;
-      }
+      if (!doctorSnap.empty) doctorId = doctorSnap.docs[0].id;
     }
 
     return {
@@ -61,9 +84,6 @@ export async function verifyAuth(req: NextRequest): Promise<AuthUser | null> {
   }
 }
 
-/**
- * Belirli rollere sahip kullanıcıları gerektirir
- */
 export function requireRoles(user: AuthUser | null, ...roles: Role[]): AuthUser {
   if (!user) throw new AuthError("Kimlik doğrulama gerekli", 401);
   if (!roles.includes(user.role)) throw new AuthError("Bu işlem için yetkiniz yok", 403);
@@ -76,9 +96,6 @@ export class AuthError extends Error {
   }
 }
 
-/**
- * API route handler wrapper — hata yakalama
- */
 export function apiHandler(
   handler: (req: NextRequest, context?: any) => Promise<NextResponse>
 ) {
@@ -96,23 +113,14 @@ export function apiHandler(
   };
 }
 
-/**
- * Ticket kodu üretici: "XXX-YYY"
- */
 export function generateTicketCode(prefix: string, sequence: number): string {
   return `${prefix}-${String(sequence).padStart(3, "0")}`;
 }
 
-/**
- * Rastgele 3 haneli prefix üret
- */
 export function generateDailyPrefix(): string {
   return String(Math.floor(100 + Math.random() * 900));
 }
 
-/**
- * Slugify (Türkçe karakter desteği)
- */
 export function slugify(text: string): string {
   return text
     .toLowerCase()

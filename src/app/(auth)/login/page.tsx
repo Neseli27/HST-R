@@ -1,99 +1,66 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import { useAuth } from "@/hooks/useAuth";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth.store";
 
+const DEMO_USERS = [
+  { id: "demo-patient", label: "Hasta", desc: "Ali Veli", icon: "🏥", color: "bg-blue-600 hover:bg-blue-700", redirect: "/queue" },
+  { id: "demo-assistant", label: "Asistan", desc: "Ayşe Kaya", icon: "👩‍⚕️", color: "bg-green-600 hover:bg-green-700", redirect: "/queue-management" },
+  { id: "demo-secretary", label: "Sekreter", desc: "Fatma Çelik", icon: "🗂️", color: "bg-yellow-600 hover:bg-yellow-700", redirect: "/check-in" },
+  { id: "demo-doctor", label: "Doktor", desc: "Uzm. Dr. Mehmet Demir", icon: "🩺", color: "bg-purple-600 hover:bg-purple-700", redirect: "/queue-management" },
+  { id: "demo-hospital-admin", label: "Hastane Yönetimi", desc: "Ahmet Yıldız", icon: "🏢", color: "bg-indigo-600 hover:bg-indigo-700", redirect: "/approvals" },
+  { id: "demo-superadmin", label: "Süper Admin", desc: "Platform Yöneticisi", icon: "⚙️", color: "bg-red-600 hover:bg-red-700", redirect: "/approvals" },
+];
+
 export default function LoginPage() {
-  return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Yükleniyor...</div>}>
-      <LoginForm />
-    </Suspense>
-  );
-}
-
-function LoginForm() {
-  const searchParams = useSearchParams();
-  const isStaff = searchParams.get("role") === "staff";
-  const { sendOtp, verifyOtp, staffLogin, redirectByRole } = useAuth();
-  const { user } = useAuthStore();
-
-  // Hasta OTP state
-  const [phone, setPhone] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpCode, setOtpCode] = useState("");
-
-  // Staff state
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-
-  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const { setUser } = useAuthStore();
+  const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  // Kullanıcı giriş yaptıysa yönlendir
-  useEffect(() => {
-    if (user) {
-      redirectByRole(user.role);
-    }
-  }, [user, redirectByRole]);
-
-  async function handleSendOtp(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
+  async function handleDemoLogin(userId: string, redirect: string) {
+    setLoading(userId);
     setError("");
-    try {
-      await sendOtp(phone);
-      setOtpSent(true);
-    } catch (err: any) {
-      setError(err.message || "OTP gönderilemedi");
-    } finally {
-      setLoading(false);
-    }
-  }
 
-  async function handleVerifyOtp(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
     try {
-      await verifyOtp(otpCode);
-      // AuthProvider otomatik yönlendirecek
-    } catch (err: any) {
-      setError(err.message || "Doğrulama başarısız");
-    } finally {
-      setLoading(false);
-    }
-  }
+      const res = await fetch("/api/auth/verify-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ demoUserId: userId }),
+      });
+      const data = await res.json();
 
-  async function handleStaffLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-    try {
-      await staffLogin(email, password);
-      // AuthProvider otomatik yönlendirecek
+      if (data.success && data.data?.user) {
+        localStorage.setItem("demoUserId", userId);
+        setUser({
+          uid: data.data.user.id,
+          phone: data.data.user.phone,
+          email: data.data.user.email,
+          firstName: data.data.user.firstName,
+          lastName: data.data.user.lastName,
+          role: data.data.user.role,
+          hospitalId: data.data.user.hospitalId,
+        });
+        router.push(redirect);
+      } else {
+        setError(data.error || "Giriş başarısız");
+      }
     } catch (err: any) {
-      setError(err.message || "Giriş başarısız");
+      setError(err.message || "Bağlantı hatası");
     } finally {
-      setLoading(false);
+      setLoading(null);
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
-      {/* Invisible reCAPTCHA container */}
-      <div id="recaptcha-container"></div>
-
-      <div className="w-full max-w-sm space-y-6">
+    <div className="flex min-h-screen items-center justify-center px-4 py-8">
+      <div className="w-full max-w-md space-y-6">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">
-            {isStaff ? "Personel Girişi" : "Hasta Girişi"}
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            {isStaff
-              ? "Email ve şifrenizi girin"
-              : "Telefon numaranızı girin"}
+          <h1 className="text-3xl font-bold text-primary-700">HST-R</h1>
+          <p className="mt-1 text-gray-500">Demo Giriş</p>
+          <p className="mt-1 text-xs text-amber-600 bg-amber-50 rounded-lg p-2">
+            Test modu aktif — bir rol seçerek giriş yapın
           </p>
         </div>
 
@@ -103,102 +70,25 @@ function LoginForm() {
           </div>
         )}
 
-        {isStaff ? (
-          <form onSubmit={handleStaffLogin} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                placeholder="email@hastane.com"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Şifre
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                placeholder="------"
-                required
-              />
-            </div>
+        <div className="space-y-3">
+          {DEMO_USERS.map((user) => (
             <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-lg bg-primary-600 px-4 py-3 font-semibold text-white transition hover:bg-primary-700 disabled:opacity-50"
+              key={user.id}
+              onClick={() => handleDemoLogin(user.id, user.redirect)}
+              disabled={loading !== null}
+              className={`w-full flex items-center gap-4 rounded-xl px-5 py-4 text-white shadow-md transition ${user.color} disabled:opacity-50`}
             >
-              {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
+              <span className="text-2xl">{user.icon}</span>
+              <div className="text-left flex-1">
+                <div className="font-semibold">{user.label}</div>
+                <div className="text-sm opacity-80">{user.desc}</div>
+              </div>
+              {loading === user.id && (
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              )}
             </button>
-          </form>
-        ) : !otpSent ? (
-          <form onSubmit={handleSendOtp} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Telefon Numarası
-              </label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-3 text-lg tracking-wider focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                placeholder="05XX XXX XX XX"
-                required
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-lg bg-primary-600 px-4 py-3 font-semibold text-white transition hover:bg-primary-700 disabled:opacity-50"
-            >
-              {loading ? "Gönderiliyor..." : "Doğrulama Kodu Gönder"}
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleVerifyOtp} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Doğrulama Kodu
-              </label>
-              <input
-                type="text"
-                value={otpCode}
-                onChange={(e) =>
-                  setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))
-                }
-                className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-3 text-center text-2xl tracking-[0.5em] focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                placeholder="000000"
-                maxLength={6}
-                required
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                {phone} numarasına gönderilen 6 haneli kodu girin
-              </p>
-            </div>
-            <button
-              type="submit"
-              disabled={loading || otpCode.length !== 6}
-              className="w-full rounded-lg bg-primary-600 px-4 py-3 font-semibold text-white transition hover:bg-primary-700 disabled:opacity-50"
-            >
-              {loading ? "Doğrulanıyor..." : "Doğrula"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setOtpSent(false)}
-              className="w-full text-sm text-gray-500 hover:text-gray-700"
-            >
-              Numarayı değiştir
-            </button>
-          </form>
-        )}
+          ))}
+        </div>
       </div>
     </div>
   );
