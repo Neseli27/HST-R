@@ -1,7 +1,8 @@
+export const dynamic = "force-dynamic";
 import { NextRequest } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { apiHandler, jsonResponse, errorResponse, slugify } from "@/lib/api-utils";
-import { v4 as uuidv4 } from "crypto";
+import crypto from "crypto";
 import type { HospitalDoc, UserDoc } from "@/types";
 
 /**

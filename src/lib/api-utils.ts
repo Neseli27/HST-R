@@ -80,11 +80,11 @@ export class AuthError extends Error {
  * API route handler wrapper — hata yakalama
  */
 export function apiHandler(
-  handler: (req: NextRequest) => Promise<NextResponse>
+  handler: (req: NextRequest, context?: any) => Promise<NextResponse>
 ) {
-  return async (req: NextRequest) => {
+  return async (req: NextRequest, context?: any) => {
     try {
-      return await handler(req);
+      return await handler(req, context);
     } catch (err) {
       if (err instanceof AuthError) {
         return errorResponse(err.message, err.status);

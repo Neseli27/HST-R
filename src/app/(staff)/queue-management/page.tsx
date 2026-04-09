@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useQueue } from "@/hooks/useQueue";
-import { useSocket } from "@/hooks/useSocket";
 
 const statusColors: Record<string, string> = {
   WAITING: "bg-yellow-50 border-yellow-200",

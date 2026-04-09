@@ -1,18 +1,21 @@
+export const dynamic = "force-dynamic";
 import { NextRequest } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
-import { apiHandler, verifyAuth, requireRoles, jsonResponse } from "@/lib/api-utils";
+import { verifyAuth, requireRoles, jsonResponse, errorResponse, AuthError } from "@/lib/api-utils";
 
-/**
- * PATCH /api/superadmin/hospitals/[id]/suspend
- */
-export const PATCH = apiHandler(async (req: NextRequest, { params }: any) => {
-  const authUser = await verifyAuth(req);
-  requireRoles(authUser, "SUPERADMIN");
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const authUser = await verifyAuth(req);
+    requireRoles(authUser, "SUPERADMIN");
 
-  await adminDb.collection("hospitals").doc(params.id).update({
-    status: "SUSPENDED",
-    updatedAt: new Date(),
-  });
+    await adminDb.collection("hospitals").doc(params.id).update({
+      status: "SUSPENDED",
+      updatedAt: new Date(),
+    });
 
-  return jsonResponse({ id: params.id, status: "SUSPENDED" });
-});
+    return jsonResponse({ id: params.id, status: "SUSPENDED" });
+  } catch (err) {
+    if (err instanceof AuthError) return errorResponse(err.message, err.status);
+    return errorResponse(err instanceof Error ? err.message : "Sunucu hatası", 500);
+  }
+}

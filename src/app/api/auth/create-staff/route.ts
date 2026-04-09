@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { apiHandler, verifyAuth, requireRoles, jsonResponse, errorResponse } from "@/lib/api-utils";
@@ -52,5 +53,5 @@ export const POST = apiHandler(async (req: NextRequest) => {
 
   await adminDb.collection("users").doc(firebaseUser.uid).set(userData);
 
-  return jsonResponse({ uid: firebaseUser.uid, ...userData }, 201);
+  return jsonResponse({ id: firebaseUser.uid, ...userData }, 201);
 });
