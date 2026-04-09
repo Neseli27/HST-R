@@ -1,0 +1,73 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "hospitals",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "appointments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "doctorId", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "appointments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "patientId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "appointments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "doctorId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "queueEntries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "queueSessionId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "priority", "order": "DESCENDING" },
+        { "fieldPath": "orderNumber", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "queueEntries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "patientId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "queueEntries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "queueSessionId", "order": "ASCENDING" },
+        { "fieldPath": "orderNumber", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "doctors",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "hospitalId", "order": "ASCENDING" },
+        { "fieldPath": "departmentId", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

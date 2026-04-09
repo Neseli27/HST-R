@@ -1,0 +1,87 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Yardımcı fonksiyonlar
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isRole(role) {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ==================== Users ====================
+    match /users/{userId} {
+      // Kendi profilini okuyabilir, admin tüm kullanıcıları okuyabilir
+      allow read: if isOwner(userId) || isRole('SUPERADMIN') || isRole('HOSPITAL_ADMIN');
+      // Kendi profilini güncelleyebilir
+      allow update: if isOwner(userId);
+      // Sadece server-side (Admin SDK) oluşturabilir
+      allow create, delete: if false;
+    }
+
+    // ==================== Hospitals ====================
+    match /hospitals/{hospitalId} {
+      // Herkes okuyabilir (hasta hastane arar)
+      allow read: if isAuthenticated();
+      // Sadece server-side
+      allow create, update, delete: if false;
+    }
+
+    // ==================== Departments ====================
+    match /departments/{deptId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if false;
+    }
+
+    // ==================== Doctors ====================
+    match /doctors/{doctorId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if false;
+    }
+
+    // ==================== Appointments ====================
+    match /appointments/{appointmentId} {
+      // Hasta kendi randevularını, asistan/doktor ilgili randevuları okur
+      allow read: if isAuthenticated();
+      allow create, update, delete: if false;
+    }
+
+    // ==================== Queue Sessions ====================
+    match /queueSessions/{sessionId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if false;
+    }
+
+    // ==================== Queue Entries ====================
+    match /queueEntries/{entryId} {
+      // Hasta kendi sırasını real-time dinler
+      // Asistan/doktor tüm sırayı dinler
+      allow read: if isAuthenticated();
+      allow create, update, delete: if false;
+    }
+
+    // ==================== Notifications ====================
+    match /notifications/{notifId} {
+      allow read: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
+      allow create, delete: if false;
+    }
+
+    // ==================== Schedule Blocks ====================
+    match /scheduleBlocks/{blockId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if false;
+    }
+  }
+}
